@@ -13,19 +13,11 @@ classifiers = [
 ]
 dependencies = [
   "pydantic>=2.12.5",
+  "mcp>=1.12.0",
 ]
 dynamic = ["version"]
 
 [project.optional-dependencies]
-tests = [
-  "pytest>=9.0.2",
-  "ruff>=0.15.1",
-  "ty>=0.0.17",
-  "mcp>=1.12.0",
-]
-mcp = [
-  "mcp>=1.12.0",
-]
 build = [
   "hatch",
   "hatchling>=1.28.0",
@@ -54,17 +46,11 @@ safari-bookmarks-mcp = "safaribookmarks.mcp.server:main"
 requires = ["hatchling>=1.28.0"]
 build-backend = "hatchling.build"
 
-[tool.hatch.build]
-sources = ["src"]
-include = [
-  "src",
-]
-exclude = [
-  ".github",
-  ".gitignore",
-  "pyproject.toml",
-  "tests",
-]
+[tool.hatch.build.targets.wheel]
+packages = ["src/safaribookmarks"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/safaribookmarks", "pyproject.toml", "README.md", "LICENSE"]
 
 [tool.hatch.version]
 source = "code"

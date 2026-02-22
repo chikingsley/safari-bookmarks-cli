@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.6.2
+
+- Fixed broken wheel: source package was missing from 0.6.1 due to incorrect hatchling include config.
+- Made `mcp` a core dependency (not optional) since this is primarily an MCP server — `uvx safari-bookmarks-mcp` now works without extras.
+- Fixed `__iter__` return type (`Iterable` → `Iterator`) and removed dict unpacking into Pydantic constructors, resolving all ty type errors.
+- Simplified README: MCP server first, uvx pattern, CLI secondary, dev at the bottom.
+
 - Fixed CI workflows: replaced `flake8`/`pip` with `ruff`/`ty`/`uv`, corrected action versions, trimmed Python matrix to 3.12+ (per `requires-python`), split lint and test into separate jobs.
 - Fixed test fixture plists that had stale URLs from the upstream fork (`evilmarty/safari-bookmarks-cli` → `chikingsley/safari-bookmarks-mcp`).
 - Updated Dependabot to track `uv` ecosystem instead of `pip`.
