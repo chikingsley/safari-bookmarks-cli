@@ -4,7 +4,7 @@ A CLI and MCP server to manage bookmarks in the Safari web browser.
 
 This utility interacts with Safari's `Bookmarks.plist` file. When it detects changes it is reloaded without intervention.
 
-**Note** macOS 10.14+ requires Full Disk Access for the application being used. ie. Terminal, iTerm, etc.
+Note macOS 10.14+ requires Full Disk Access for the application being used. ie. Terminal, iTerm, etc.
 
 ## Installation
 
