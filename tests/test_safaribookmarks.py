@@ -500,7 +500,6 @@ class TestSafariBookmarkItem:
             assert actual in subject
             assert actual.parent == subject
 
-
     def test_bool_empty_folder(self):
         """An empty folder (len==0) must still be truthy."""
         node = WebBookmarkTypeList(Title="Empty", Children=[])
