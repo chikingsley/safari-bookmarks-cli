@@ -6,6 +6,10 @@ This utility interacts with Safari's `Bookmarks.plist` file. When it detects cha
 
 Note macOS 10.14+ requires Full Disk Access for the application being used. ie. Terminal, iTerm, etc.
 
+## Attribution / Credits
+
+This project builds upon the excellent [safari-bookmarks-cli](https://github.com/evilmarty/safari-bookmarks-cli) by Marty (evilmarty), who developed the original Safari plist parsing and mutation logic. It has been extended here to support the Model Context Protocol (MCP) for LLM tool integration, modern `uv` toolchain, and expanded capabilities.
+
 ## Installation
 
 You can install safari-bookmarks-mcp with uv:

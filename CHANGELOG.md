@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Publication**: Updated package publication metadata and authorship for PyPI release via `uv`.
+- **Attribution**: Added formal homage and attribution to `evilmarty` (Marty) for the core CLI logic in accordance with the Apache 2.0 license.
 - Renamed project from `safari-bookmarks-cli` to `safari-bookmarks-mcp` to reflect MCP server support.
 - Reorganized source into `cli/` and `mcp/` subpackages for clearer separation of concerns.
 - Added MCP bootstrap support via `safari-bookmarks bootstrap` to generate local/global client configuration for Claude Code, OpenCode, Codex, and Gemini.

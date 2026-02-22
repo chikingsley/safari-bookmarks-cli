@@ -1,7 +1,7 @@
 [project]
 name = "safari-bookmarks-mcp"
 authors = [
-  { name="Marty", email="marty@zalega.me" },
+  { name="Kingsley Chiejine", email="chikingsley@gmail.com" },
 ]
 description = "A CLI and MCP server to manage bookmarks in the Safari web browser."
 readme = "README.md"
@@ -43,8 +43,8 @@ dev = [
 default-groups = ["dev"]
 
 [project.urls]
-"Homepage" = "https://github.com/evilmarty/safari-bookmarks-mcp"
-"Bug Tracker" = "https://github.com/evilmarty/safari-bookmarks-mcp/issues"
+"Homepage" = "https://github.com/chikingsley/safari-bookmarks-cli"
+"Bug Tracker" = "https://github.com/chikingsley/safari-bookmarks-cli/issues"
 
 [project.scripts]
 safari-bookmarks = "safaribookmarks.cli.main:main"
