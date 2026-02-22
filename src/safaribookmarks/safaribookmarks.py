@@ -2,7 +2,7 @@ import base64
 import json as json_module
 import os
 import plistlib
-from collections.abc import Iterable
+from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import IO
@@ -43,7 +43,7 @@ class SafariBookmarkItem:
     def __hash__(self) -> int:
         return hash(self._node)
 
-    def __iter__(self) -> Iterable["SafariBookmarkItem"]:
+    def __iter__(self) -> Iterator["SafariBookmarkItem"]:
         for child in getattr(self._node, "children", []):
             yield SafariBookmarkItem(
                 node=child,
@@ -169,18 +169,18 @@ class SafariBookmarkItem:
         self, url: str, title: str | None = None, id: str | None = None
     ) -> "SafariBookmarkItem":
         uri_dictionary = {"title": title} if title is not None else {}
-        kwargs = {"URLString": url, "URIDictionary": uri_dictionary}
+        leaf = WebBookmarkTypeLeaf(URLString=url, URIDictionary=uri_dictionary)
         if id is not None:
-            kwargs["WebBookmarkUUID"] = id
-        item = SafariBookmarkItem(node=WebBookmarkTypeLeaf(**kwargs))
+            leaf.web_bookmark_uuid = id
+        item = SafariBookmarkItem(node=leaf)
         self.append(item)
         return item
 
     def add_folder(self, title: str, id: str | None = None) -> "SafariBookmarkItem":
-        kwargs = {"Title": title, "Children": []}
+        folder = WebBookmarkTypeList(Title=title, Children=[])
         if id is not None:
-            kwargs["WebBookmarkUUID"] = id
-        item = SafariBookmarkItem(node=WebBookmarkTypeList(**kwargs))
+            folder.web_bookmark_uuid = id
+        item = SafariBookmarkItem(node=folder)
         self.append(item)
         return item
 
