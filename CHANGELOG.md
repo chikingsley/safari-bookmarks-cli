@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Fixed CI workflows: replaced `flake8`/`pip` with `ruff`/`ty`/`uv`, corrected action versions, trimmed Python matrix to 3.12+ (per `requires-python`), split lint and test into separate jobs.
+- Fixed test fixture plists that had stale URLs from the upstream fork (`evilmarty/safari-bookmarks-cli` → `chikingsley/safari-bookmarks-mcp`).
+- Updated Dependabot to track `uv` ecosystem instead of `pip`.
+
+## 0.6.1
+
 - **Publication**: Updated package publication metadata and authorship for PyPI release via `uv`.
 - **Attribution**: Added formal homage and attribution to `evilmarty` (Marty) for the core CLI logic in accordance with the Apache 2.0 license.
 - Renamed project from `safari-bookmarks-cli` to `safari-bookmarks-mcp` to reflect MCP server support.

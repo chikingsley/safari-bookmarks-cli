@@ -1,6 +1,6 @@
 7551D1F4-38C1-4DB3-88AC-90C15F10338D History 
 3B5180DB-831D-4F1A-AE4A-6482D28D66D5 BookmarksBar 
-B441CA58-1880-4151-929E-743090B66587 Safari Bookmarks CLI https://github.com/evilmarty/safari-bookmarks-cli
+B441CA58-1880-4151-929E-743090B66587 Safari Bookmarks CLI https://github.com/chikingsley/safari-bookmarks-mcp
 1E830274-3DB6-42F2-BE8E-14E2BA75418C Python https://www.python.org
 AB38D373-1266-495A-8CAC-422A771CF70A Safari http://apple.com/safari
 20ABDC16-B491-47F4-B252-2A3065CFB895 BookmarksMenu 

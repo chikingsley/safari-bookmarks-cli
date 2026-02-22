@@ -9,7 +9,7 @@ _ensure-venv:
 
 [private]
 _install-test-deps:
-  uv sync --extra tests
+  uv sync --locked --dev
 
 # Create a local venv and install test/lint/type-check dependencies.
 setup: _ensure-venv _install-test-deps

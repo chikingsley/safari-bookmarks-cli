@@ -211,13 +211,13 @@ For local Python execution, use `safari-bookmarks-mcp` directly or `uv run pytho
 Clone the repository:
 
 ```shell
-git clone https://github.com/evilmarty/safari-bookmarks-mcp.git
+git clone https://github.com/chikingsley/safari-bookmarks-mcp.git
 ```
 
 Install test/lint/type-check deps:
 
 ```shell
-uv sync --extra tests
+uv sync --locked --dev
 ```
 
 Run tests, lint, and type checks:
@@ -226,9 +226,8 @@ Run tests, lint, and type checks:
 just check
 ```
 
-Using uv:
+Or directly with uv:
 
 ```shell
-uv sync
 uv run ruff check src tests && uv run ty check src tests && uv run pytest
 ```

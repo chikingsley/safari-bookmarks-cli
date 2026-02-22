@@ -561,7 +561,7 @@ class TestSafariBookmarks:
                         WebBookmarkTypeLeaf(
                             WebBookmarkUUID="B441CA58-1880-4151-929E-743090B66587",
                             WebBookmarkType="WebBookmarkTypeLeaf",
-                            URLString="https://github.com/evilmarty/safari-bookmarks-cli",
+                            URLString="https://github.com/chikingsley/safari-bookmarks-mcp",
                             URIDictionary={"title": "Safari Bookmarks CLI"},
                             ReadingListNonSync={"neverFetchMetadata": False},
                         ),
@@ -675,8 +675,8 @@ class TestSafariBookmarks:
     @pytest.mark.parametrize(
         ("digest", "binary"),
         [
-            ("ac34fa864fc62a2decf219cf3df78fd1da7ec25d", True),
-            ("1b7a31279c90fe6775f8d93fa2e2c202d4e8bca8", False),
+            ("d511ce45ce3f14a2cccb18a07a05e7e75cb7d7b7", True),
+            ("27cad5206ac74ba085f67ecb0a56649e37ad206d", False),
         ],
     )
     def test_dump(self, digest: str, binary: bool, subject):
