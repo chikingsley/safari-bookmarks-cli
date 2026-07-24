@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+
+if [ "${SKIP_LOCAL_CI:-}" = "1" ]; then
+  echo "Skipping local pre-push gate because SKIP_LOCAL_CI=1."
+  exit 0
+fi
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+if ! command -v just >/dev/null 2>&1; then
+  echo "pre-push: 'just' is required. Install just or push with SKIP_LOCAL_CI=1." >&2
+  exit 1
+fi
+
+echo "Running local pre-push gate: just check && just audit"
+just check
+just audit

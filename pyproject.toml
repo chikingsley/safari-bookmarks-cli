@@ -12,23 +12,28 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 dependencies = [
-  "pydantic>=2.12.5",
-  "mcp>=1.12.0",
+  "pydantic>=2.13.4",
+  "mcp>=1.27.2",
 ]
 dynamic = ["version"]
 
 [project.optional-dependencies]
 build = [
-  "hatch",
-  "hatchling>=1.28.0",
+  "hatch>=1.17.0",
+  "hatchling>=1.30.1",
 ]
 
 [dependency-groups]
 dev = [
-  "pytest>=9.0.2",
-  "ruff>=0.15.1",
-  "ty>=0.0.17",
-  "mcp>=1.12.0",
+  "pytest>=9.1.0",
+  "ruff>=0.15.17",
+  "ty>=0.0.49",
+  "mcp>=1.27.2",
+]
+audit = [
+  "pip-audit>=2.10.1",
+  "truststore>=0.10.4",
+  "zizmor>=1.25.2",
 ]
 
 [tool.uv]
@@ -43,7 +48,7 @@ safari-bookmarks = "safaribookmarks.cli.main:main"
 safari-bookmarks-mcp = "safaribookmarks.mcp.server:main"
 
 [build-system]
-requires = ["hatchling>=1.28.0"]
+requires = ["hatchling>=1.30.1"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -63,60 +68,64 @@ target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
-extend-select = [
-    "F",    # Pyflakes rules
-    "W",    # PyCodeStyle warnings
-    "E",    # PyCodeStyle errors
-    "I",    # Sort imports properly
-    "B",    # flake8-bugbear
-    "UP",   # Warn if certain things can be changed due to newer Python versions
-    "C4",   # Catch incorrect use of comprehensions, dict, list, etc
-    "FA",   # Enforce from __future__ import annotations
-    "ISC",  # Good use of string concatenation
-    "ICN",  # Use common import conventions
-    "RET",  # Good return practices
-    "SIM",  # Common simplification rules
-    "TID",  # Some good import practices
-    "TC",   # Enforce importing certain types in a TYPE_CHECKING block
-    "PTH",  # Use pathlib instead of os.path
-    "TD",   # Be diligent with TODO comments
-    "S",    # flake8-bandit security checks
-    "PERF", # Performance anti-patterns
-    "PL",   # Pylint rules
-    "RUF",  # Ruff-specific rules
-    "ERA",  # Detect commented-out code
-    "FBT",  # Boolean trap detection
-]
+preview = true
+select = ["ALL"]
 ignore = [
+    "CPY",     # no copyright header boilerplate in this project
     "E501",    # line too long (handled by formatter)
     "B008",    # function calls in argument defaults (existing CLI API patterns)
+    "COM812",  # conflicts with Ruff formatter
+    "D",       # no docstring requirement for this small CLI package
+    "EM",      # exception message constants add noise here
     "PLR2004", # magic value comparisons
+    "TRY003",  # direct exception messages are clearer in this CLI
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"src/safaribookmarks/bookmarks.py" = [
+    "PLR0904", # tree wrapper intentionally exposes list-like and domain operations
+    "SLF001",  # same-class tree mutations need direct child node/parent updates
+]
+"src/safaribookmarks/mcp/bootstrap.py" = ["PLR0914"]
+"src/safaribookmarks/mcp/server.py" = [
+    "A002",   # MCP schema uses the public field name `id`
+    "ANN401", # FastMCP tool registration is dynamically typed
+    "C901",
+]
+"tests/test_mcp_server.py" = ["ANN401"]
 "tests/**" = [
     "S101",
     "S108",
     "FBT",
+    "PLR6301",
     "PLR0913",
     "PLC0415",
     "TC",
     "S324",
 ]
-"src/**/cli/cli.py" = ["FBT", "PLR0913"]
+"src/**/cli/commands.py" = ["FBT", "PLR0913"]
 
 [tool.ruff.format]
 quote-style = "double"
 
 [tool.ty.src]
+include = ["src", "tests"]
 exclude = ["demo.py"]
+respect-ignore-files = true
 
 [tool.ty.rules]
+all = "error"
 # Pydantic model aliases and fixture dictionaries intentionally include many external keys
 unknown-argument = "ignore"
 
+[tool.ty.analysis]
+respect-type-ignore-comments = false
+
 [tool.ty.environment]
 python-version = "3.12"
+
+[tool.ty.terminal]
+error-on-warning = true
 
 [tool.pytest.ini_options]
 addopts = [

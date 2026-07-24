@@ -3,7 +3,7 @@ from os.path import expanduser
 from sys import stdout
 from uuid import UUID
 
-from safaribookmarks.cli.cli import CLI
+from safaribookmarks.cli.commands import CLI
 from safaribookmarks.mcp.bootstrap import SUPPORTED_CLIENTS, BootstrapOptions, bootstrap_mcp
 from safaribookmarks.version import VERSION
 
@@ -39,6 +39,7 @@ def parse_args() -> Namespace:
     group.add_argument(
         "--format",
         "-F",
+        dest="output_format",
         required=False,
         help="Customize the output format. Available placeholders: {title}, {url}, {id}, {type}, {prefix}, {suffix}.",
     )
@@ -60,7 +61,7 @@ def parse_args() -> Namespace:
         nargs="*",
         help="The UUID or bookmark or folder path to show. Default shows all.",
     )
-    parser_list.set_defaults(command="list")
+    parser_list.set_defaults(command="list_bookmarks")
     parser_add = subparsers.add_parser(
         "add",
         aliases=["a", "create"],
@@ -86,7 +87,7 @@ def parse_args() -> Namespace:
     group.add_argument("--url", help="The URL for the bookmark.")
     group.add_argument(
         "--folder",
-        dest="list",
+        dest="folder",
         action=BooleanOptionalAction,
         default=False,
         help="Add a folder instead of a bookmark.",
@@ -186,7 +187,7 @@ def parse_args() -> Namespace:
     return parser.parse_args()
 
 
-def main():
+def main() -> None:
     args = parse_args().__dict__
     file = args.pop("file")
     command = args.pop("command")

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import uuid
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal, Union, override
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -24,6 +26,7 @@ class WebBookmarkType(BaseModel):
         default_factory=lambda: str(uuid.uuid4()),
     )
 
+    @override
     def __hash__(self) -> int:
         return hash(self.web_bookmark_uuid)
 
@@ -47,7 +50,7 @@ class WebBookmarkTypeLeaf(WebBookmarkType):
         return self.uri_dictionary.get("title", "")
 
     @title.setter
-    def title(self, value) -> None:
+    def title(self, value: str) -> None:
         self.uri_dictionary["title"] = value
 
 

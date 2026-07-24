@@ -25,7 +25,7 @@ Add to your client config — `uvx` handles installation automatically:
 Or use the bootstrap command to generate config for Claude Code, OpenCode, Codex, and Gemini:
 
 ```shell
-uvx safari-bookmarks-mcp bootstrap --client claude --client opencode --scope local --write
+uvx --from safari-bookmarks-mcp safari-bookmarks bootstrap --client claude --client opencode --scope local --write
 ```
 
 Scopes: `local` (project-level), `global` (user-level), `both`.
@@ -46,7 +46,7 @@ uvx --from safari-bookmarks-mcp safari-bookmarks --help
 safari-bookmarks list
 safari-bookmarks list "BookmarksMenu"
 safari-bookmarks add --title "Example" --url "http://example.com" "BookmarksMenu"
-safari-bookmarks add --title "New Folder" --list "BookmarksBar"
+safari-bookmarks add --title "New Folder" --folder "BookmarksBar"
 safari-bookmarks move "BookmarksMenu" "Example" --to "BookmarksBar" "New Folder"
 safari-bookmarks remove "BookmarksBar" "New Folder"
 safari-bookmarks empty "BookmarksBar" "New Folder"

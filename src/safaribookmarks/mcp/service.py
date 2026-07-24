@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any
 
-from safaribookmarks.safaribookmarks import SafariBookmarkItem, SafariBookmarks
+from safaribookmarks.bookmarks import SafariBookmarkItem, SafariBookmarks
 
 
 class SafariBookmarksService:
@@ -17,12 +19,7 @@ class SafariBookmarksService:
         self._bookmarks = SafariBookmarks.open(self._path)
 
     def _resolve(self, path: list[str] | None = None) -> SafariBookmarkItem:
-        path = path or []
-        if len(path) == 1:
-            item = self._bookmarks.get(path[0])
-            if item is not None:
-                return item
-        item = self._bookmarks.walk(*path)
+        item = self._bookmarks.resolve_path(path)
         if item is None:
             raise ValueError("Target not found")
         return item
@@ -83,7 +80,7 @@ class SafariBookmarksService:
         title: str | None,
         url: str,
         *,
-        id: str | None = None,
+        bookmark_id: str | None = None,
         dry_run: bool = False,
     ) -> dict[str, Any]:
         target = self._resolve(path)
@@ -91,7 +88,7 @@ class SafariBookmarksService:
             raise ValueError("Invalid destination")
         if not url:
             raise ValueError("URL is required")
-        item = target.add_bookmark(url=url, title=title, id=id)
+        item = target.add_bookmark(url=url, title=title, bookmark_id=bookmark_id)
         result = self._serialize(item, recursive=True)
         self._finalize(dry_run=dry_run)
         return result
@@ -101,7 +98,7 @@ class SafariBookmarksService:
         path: list[str] | None,
         title: str | None,
         *,
-        id: str | None = None,
+        bookmark_id: str | None = None,
         dry_run: bool = False,
     ) -> dict[str, Any]:
         target = self._resolve(path)
@@ -109,7 +106,7 @@ class SafariBookmarksService:
             raise ValueError("Invalid destination")
         if not title:
             raise ValueError("Title is required")
-        item = target.add_folder(title=title, id=id)
+        item = target.add_folder(title=title, bookmark_id=bookmark_id)
         result = self._serialize(item, recursive=True)
         self._finalize(dry_run=dry_run)
         return result
@@ -141,9 +138,9 @@ class SafariBookmarksService:
             raise ValueError("Invalid source")
         if not destination.is_folder:
             raise ValueError("Invalid destination")
-        current = destination
+        current: SafariBookmarkItem | None = destination
         while current is not None:
-            if current is target:
+            if current == target:
                 raise ValueError("Invalid destination")
             current = current.parent
         destination.append(target)

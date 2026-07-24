@@ -202,7 +202,7 @@ def build_server(
     confirm_write: bool = False,
 ) -> Any:
     if FastMCP is None:  # pragma: no cover
-        raise RuntimeError("Install safari-bookmarks-mcp[mcp] to run the MCP server")
+        raise RuntimeError("The 'mcp' package is required to run the MCP server")
 
     service = _build_service(path)
     mcp = FastMCP("safari-bookmarks")
@@ -275,7 +275,7 @@ def build_server(
             path=request.path,
             title=request.title,
             url=request.url,
-            id=request.id,
+            bookmark_id=request.id,
             dry_run=request.dry_run,
         )
         return _result_payload(
@@ -307,7 +307,7 @@ def build_server(
         result = service.add_folder(
             path=request.path,
             title=request.title,
-            id=request.id,
+            bookmark_id=request.id,
             dry_run=request.dry_run,
         )
         return _result_payload(
@@ -401,7 +401,7 @@ def build_server(
         request = _parse_payload(_RequiredPathRequest, {"path": path, "dry_run": dry_run})
         _require_write_permission(dry_run=request.dry_run)
         before = service.snapshot(path=request.path, recursive=False)
-        child_count = len(before.get("children", []))
+        child_count = before.get("child_count", 0)
         result = service.empty(path=request.path, dry_run=request.dry_run)
         return _result_payload(
             "empty_folder",

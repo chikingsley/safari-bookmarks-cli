@@ -1,11 +1,19 @@
+from __future__ import annotations
+
 import base64
 import json as json_module
 import os
 import plistlib
-from collections.abc import Iterator
+import shutil
+import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import IO
+from typing import TYPE_CHECKING, override
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from types import TracebackType
+    from typing import IO, Self
 
 from .models import (
     WebBookmarkType,
@@ -21,16 +29,18 @@ class SafariBookmarkItem:
     def __init__(
         self,
         node: WebBookmarkType,
-        parent: "SafariBookmarkItem | None" = None,
+        parent: SafariBookmarkItem | None = None,
     ) -> None:
         if not getattr(parent, "is_folder", True):
             raise ValueError("Parent must be a folder")
         self._node = node
         self._parent = parent
 
+    @override
     def __str__(self) -> str:
         return self.title
 
+    @override
     def __repr__(self) -> str:
         return repr(self._node)
 
@@ -40,10 +50,11 @@ class SafariBookmarkItem:
     def __bool__(self) -> bool:
         return True
 
+    @override
     def __hash__(self) -> int:
         return hash(self._node)
 
-    def __iter__(self) -> Iterator["SafariBookmarkItem"]:
+    def __iter__(self) -> Iterator[SafariBookmarkItem]:
         for child in getattr(self._node, "children", []):
             yield SafariBookmarkItem(
                 node=child,
@@ -53,10 +64,11 @@ class SafariBookmarkItem:
     def __contains__(self, other: object) -> bool:
         return any(child == other for child in self)
 
+    @override
     def __eq__(self, value: object) -> bool:
         return type(self) is type(value) and self._node == getattr(value, "_node", None)
 
-    def __getitem__(self, key) -> "SafariBookmarkItem":
+    def __getitem__(self, key: str | tuple[str, ...]) -> SafariBookmarkItem:
         if isinstance(key, tuple):
             item = self
             for x in key:
@@ -65,7 +77,7 @@ class SafariBookmarkItem:
         if not isinstance(key, str):
             raise TypeError(type(key).__name__)
         for child in self:
-            if key in (child.id, child.title):
+            if key in {child.id, child.title}:
                 return child
         raise KeyError(key)
 
@@ -117,23 +129,23 @@ class SafariBookmarkItem:
             self._node.url_string = url
 
     @property
-    def children(self) -> list["SafariBookmarkItem"]:
+    def children(self) -> list[SafariBookmarkItem]:
         return list(iter(self))
 
     @property
-    def parent(self) -> "SafariBookmarkItem | None":
+    def parent(self) -> SafariBookmarkItem | None:
         return self._parent
 
-    def get(self, id: str) -> "SafariBookmarkItem | None":
-        if self.id.lower() == id.lower():
+    def get(self, bookmark_id: str) -> SafariBookmarkItem | None:
+        if self.id.lower() == bookmark_id.lower():
             return self
         for child in self:
-            result = child.get(id)
+            result = child.get(bookmark_id)
             if result is not None:
                 return result
         return None
 
-    def walk(self, *titles) -> "SafariBookmarkItem | None":
+    def walk(self, *titles: str) -> SafariBookmarkItem | None:
         if len(titles) == 0:
             return self
         title = titles[0]
@@ -142,7 +154,15 @@ class SafariBookmarkItem:
                 return child.walk(*titles[1:])
         return None
 
-    def remove(self, item: "SafariBookmarkItem") -> None:
+    def resolve_path(self, path: list[str] | None = None) -> SafariBookmarkItem | None:
+        path = path or []
+        if len(path) == 1:
+            item = self.get(path[0])
+            if item is not None:
+                return item
+        return self.walk(*path)
+
+    def remove(self, item: SafariBookmarkItem) -> None:
         if item not in self:
             raise RuntimeError("Not a child")
         if not item.movable:
@@ -153,7 +173,7 @@ class SafariBookmarkItem:
     def empty(self) -> None:
         getattr(self._node, "children", []).clear()
 
-    def append(self, item: "SafariBookmarkItem") -> None:
+    def append(self, item: SafariBookmarkItem) -> None:
         if not self.is_folder:
             raise RuntimeError("Not a folder")
         if not item.movable:
@@ -166,20 +186,20 @@ class SafariBookmarkItem:
         item._parent = self
 
     def add_bookmark(
-        self, url: str, title: str | None = None, id: str | None = None
-    ) -> "SafariBookmarkItem":
+        self, url: str, title: str | None = None, bookmark_id: str | None = None
+    ) -> SafariBookmarkItem:
         uri_dictionary = {"title": title} if title is not None else {}
         leaf = WebBookmarkTypeLeaf(URLString=url, URIDictionary=uri_dictionary)
-        if id is not None:
-            leaf.web_bookmark_uuid = id
+        if bookmark_id is not None:
+            leaf.web_bookmark_uuid = bookmark_id
         item = SafariBookmarkItem(node=leaf)
         self.append(item)
         return item
 
-    def add_folder(self, title: str, id: str | None = None) -> "SafariBookmarkItem":
+    def add_folder(self, title: str, bookmark_id: str | None = None) -> SafariBookmarkItem:
         folder = WebBookmarkTypeList(Title=title, Children=[])
-        if id is not None:
-            folder.web_bookmark_uuid = id
+        if bookmark_id is not None:
+            folder.web_bookmark_uuid = bookmark_id
         item = SafariBookmarkItem(node=folder)
         self.append(item)
         return item
@@ -200,21 +220,27 @@ class SafariBookmarkItem:
 
 
 class SafariBookmarks(SafariBookmarkItem):
-    __slots__ = ("_binary", "_node", "_parent", "_path")
+    __slots__ = ("_binary", "_path")
 
     def __init__(self, root: WebBookmarkTypeList) -> None:
         super().__init__(node=root)
         self._path = None
         self._binary = None
 
-    def __enter__(self) -> "SafariBookmarks":
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         if exc_type is None and self.path is not None:
             self.save()
 
     @property
+    @override
     def movable(self) -> bool:
         return False
 
@@ -226,25 +252,47 @@ class SafariBookmarks(SafariBookmarkItem):
     def binary(self) -> bool | None:
         return self._binary
 
-    def dump(self, fp: IO, *, binary: bool = True) -> None:
+    def dump(self, fp: IO[bytes], *, binary: bool = True) -> None:
         if hasattr(fp, "mode") and "b" not in fp.mode:
             raise OSError("Must be in binary mode")
         fmt = plistlib.FMT_BINARY if binary else plistlib.FMT_XML
         data = self._node.model_dump(by_alias=True)
         plistlib.dump(data, fp, fmt=fmt, sort_keys=True, skipkeys=False)
 
-    def save(self, path: os.PathLike | str | None = None, *, binary: bool | None = None) -> None:
+    def save(
+        self,
+        path: os.PathLike[str] | str | None = None,
+        *,
+        binary: bool | None = None,
+        backup: bool = True,
+    ) -> None:
         if path is None:
             path = self.path
         if path is None:
             raise RuntimeError("Not opened")
         if binary is None:
-            binary = self.binary or True
-        with Path(path).open("wb") as file:
-            self.dump(fp=file, binary=binary)
+            binary = True if self.binary is None else self.binary
+        target = Path(path)
+        target_mode = target.stat().st_mode if target.exists() else None
+        if backup and target.exists():
+            timestamp = datetime.now().astimezone().strftime("%Y%m%d-%H%M%S-%f")
+            shutil.copy2(target, target.with_name(f"{target.name}.{timestamp}.bak"))
+        # Write to a temporary file in the same directory, then atomically
+        # replace the target so a crash mid-write cannot corrupt the plist.
+        fd, tmp_name = tempfile.mkstemp(prefix=f"{target.name}.", suffix=".tmp", dir=target.parent)
+        tmp_path = Path(tmp_name)
+        try:
+            with os.fdopen(fd, "wb") as file:
+                self.dump(fp=file, binary=binary)
+            if target_mode is not None:
+                tmp_path.chmod(target_mode)
+            tmp_path.replace(target)
+        except BaseException:
+            tmp_path.unlink(missing_ok=True)
+            raise
 
     @classmethod
-    def load(cls, fp: IO, *, binary: bool = True) -> "SafariBookmarks":
+    def load(cls, fp: IO[bytes], *, binary: bool = True) -> SafariBookmarks:
         if hasattr(fp, "mode") and "b" not in fp.mode:
             raise OSError("Must be in binary mode")
         fmt = plistlib.FMT_BINARY if binary else plistlib.FMT_XML
@@ -254,7 +302,7 @@ class SafariBookmarks(SafariBookmarkItem):
         return obj
 
     @classmethod
-    def open(cls, path: os.PathLike | str, *, binary: bool = True) -> "SafariBookmarks":
+    def open(cls, path: os.PathLike[str] | str, *, binary: bool = True) -> SafariBookmarks:
         with Path(path).open("rb") as file:
             obj = cls.load(fp=file, binary=binary)
             obj._path = Path(path)

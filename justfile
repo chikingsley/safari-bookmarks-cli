@@ -1,4 +1,5 @@
-set shell := ["bash", "-euo", "pipefail"]
+set shell := ["bash", "-euo", "pipefail", "-c"]
+export UV_SYSTEM_CERTS := "1"
 
 default:
   @just --list
@@ -20,9 +21,11 @@ venv: _ensure-venv
 # Install dependencies needed to run tests/lint/type checks in place.
 install-test-deps: _install-test-deps
 
-# Install dependencies needed for the MCP CLI entrypoint.
-mcp-deps:
-  uv sync --extra mcp
+# Install local git hooks that run the quality/security gate before push.
+install-hooks:
+  mkdir -p .git/hooks
+  cp scripts/git-hooks/pre-push .git/hooks/pre-push
+  chmod +x .git/hooks/pre-push
 
 # Open MCP server help output.
 mcp-server:
@@ -51,6 +54,19 @@ typecheck:
 # Run test suite.
 test:
   uv run pytest
+
+# Audit locked Python dependencies for known vulnerabilities.
+audit-deps:
+  uv run --locked --group audit python scripts/audit_deps.py
+
+# Audit GitHub Actions workflows for common supply-chain hazards.
+audit-actions:
+  uv run --locked --group audit zizmor .github/workflows
+
+# Run supply-chain checks.
+audit:
+  just audit-deps
+  just audit-actions
 
 # Run all local quality gates.
 check:

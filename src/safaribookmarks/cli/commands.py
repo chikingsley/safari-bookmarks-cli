@@ -1,10 +1,14 @@
-import builtins
+from __future__ import annotations
+
 import os
 from io import UnsupportedOperation
-from pathlib import Path
-from typing import IO
+from typing import TYPE_CHECKING
 
-from safaribookmarks.safaribookmarks import SafariBookmarkItem, SafariBookmarks
+from safaribookmarks.bookmarks import SafariBookmarkItem, SafariBookmarks
+
+if TYPE_CHECKING:
+    from pathlib import Path
+    from typing import IO
 
 DEFAULT_LIST_FORMAT = "{grey}{icon}{reset} {title: <50} {dark_grey}{id: <38}{cyan}{url}{reset}"
 SIMPLE_FORMAT = "{grey}{icon}{reset} {title: <50} {cyan}{url}{reset}"
@@ -38,7 +42,7 @@ COLORS: dict[str, int] = {
 
 
 class CLI:
-    def __init__(self, path: str, out: IO) -> None:
+    def __init__(self, path: str, out: IO[str]) -> None:
         self.bookmarks = SafariBookmarks.open(path)
         self.output = out
         self.colors = generate_colors(out)
@@ -47,7 +51,7 @@ class CLI:
     def path(self) -> Path | None:
         return self.bookmarks.path
 
-    def run(self, command: str, **kwargs) -> None:
+    def run(self, command: str, **kwargs: object) -> None:
         if command is None:
             raise ValueError("No command specified")
         func = getattr(self, command, None)
@@ -55,19 +59,21 @@ class CLI:
             raise ValueError(f"Invalid command: {command}")
         func(**kwargs)
 
-    def _get_or_walk(self, path: builtins.list[str]) -> SafariBookmarkItem | None:
-        if len(path) == 1:
-            result = self.bookmarks.get(path[0])
-            if result is not None:
-                return result
-        return self.bookmarks.walk(*path)
+    def _resolve(self, path: list[str]) -> SafariBookmarkItem | None:
+        return self.bookmarks.resolve_path(path)
 
     def _save(self) -> None:
         self.bookmarks.save()
 
-    def _render_item(self, item: SafariBookmarkItem, format: str, depth: int = 0, icon: str = ""):
+    def _render_item(
+        self,
+        item: SafariBookmarkItem,
+        item_format: str,
+        depth: int = 0,
+        icon: str = "",
+    ) -> None:
         self.output.write(
-            f"{format}\n".format(
+            f"{item_format}\n".format(
                 **self.colors,
                 icon=icon,
                 depth=depth,
@@ -78,9 +84,14 @@ class CLI:
             )
         )
         if item.is_folder:
-            self._render_children(item, format=format, depth=depth + 1)
+            self._render_children(item, item_format=item_format, depth=depth + 1)
 
-    def _render_children(self, item: SafariBookmarkItem, format: str, depth: int = 0):
+    def _render_children(
+        self,
+        item: SafariBookmarkItem,
+        item_format: str,
+        depth: int = 0,
+    ) -> None:
         last_index = len(item) - 1
         for index, child in enumerate(item):
             icon = ICON_LAST_LEAF if index == last_index else ICON_MIDDLE_LEAF
@@ -90,91 +101,101 @@ class CLI:
                 icon = ICON_SINGLE_LEAF
             if depth > 0:
                 icon = f"{ICON_LIST_CONTAINER * depth} {icon}"
-            self._render_item(child, format, depth=depth, icon=icon)
+            self._render_item(child, item_format, depth=depth, icon=icon)
 
     def _render(
         self,
         root: SafariBookmarkItem,
-        format: str,
-        only_children=False,
-        json=False,
-    ):
+        item_format: str,
+        only_children: bool = False,
+        json: bool = False,
+    ) -> None:
         if json:
             self.output.write(root.json())
         elif only_children:
-            self._render_children(root, format=format)
+            self._render_children(root, item_format=item_format)
         else:
-            self._render_item(root, format=format)
+            self._render_item(root, item_format=item_format)
 
-    def list(
+    def list_bookmarks(
         self,
-        path: builtins.list[str] | None = None,
-        format: str | None = None,
-        simple_format=False,
-        json=False,
-    ):
+        path: list[str] | None = None,
+        output_format: str | None = None,
+        simple_format: bool = False,
+        json: bool = False,
+    ) -> None:
         path = path or []
-        target = self._get_or_walk(path)
+        target = self._resolve(path)
         if target is None:
             raise ValueError("Target not found")
         if simple_format:
-            format = SIMPLE_FORMAT
-        elif format is None:
-            format = DEFAULT_LIST_FORMAT
-        self._render(target, only_children=target.is_folder, format=format, json=json)
+            output_format = SIMPLE_FORMAT
+        elif output_format is None:
+            output_format = DEFAULT_LIST_FORMAT
+        self._render(
+            target,
+            only_children=target.is_folder,
+            item_format=output_format,
+            json=json,
+        )
 
     def add(
         self,
         title: str | None,
         uuid: str | None = None,
         url: str | None = None,
-        path: builtins.list[str] | None = None,
-        list=False,
-    ):
+        path: list[str] | None = None,
+        folder: bool = False,
+    ) -> None:
         path = path or []
-        target = self._get_or_walk(path)
+        target = self._resolve(path)
         if target is None or not target.is_folder:
             raise ValueError("Invalid destination")
-        if list:
+        if folder:
             if url:
                 raise ValueError("URL is not supported by lists")
             if not title:
                 raise ValueError("Title is required")
-            target.add_folder(title=title, id=uuid)
+            target.add_folder(title=title, bookmark_id=uuid)
         elif url is None:
             raise ValueError("URL is required")
         else:
-            target.add_bookmark(url=url, id=uuid, title=title)
+            target.add_bookmark(url=url, bookmark_id=uuid, title=title)
         self._save()
 
-    def remove(self, path: builtins.list[str]):
-        target = self._get_or_walk(path)
+    def remove(self, path: list[str]) -> None:
+        target = self._resolve(path)
         if target is None:
             raise ValueError("Target not found")
         if parent := target.parent:
             parent.remove(target)
         self._save()
 
-    def move(self, path: builtins.list[str], to: builtins.list[str] | None = None):
+    def move(self, path: list[str], to: list[str] | None = None) -> None:
         to = to or []
-        target = self._get_or_walk(path)
+        target = self._resolve(path)
         if target is None:
             raise ValueError("Target not found")
         if not to:
             raise ValueError("Missing destination")
-        dest = self._get_or_walk(to)
+        dest = self._resolve(to)
         if dest is None or not dest.is_folder:
             raise ValueError("Invalid destination")
+        current: SafariBookmarkItem | None = dest
+        while current is not None:
+            if current == target:
+                raise ValueError("Invalid destination")
+            current = current.parent
         dest.append(target)
         self._save()
 
     def edit(
         self,
-        path: builtins.list[str],
+        path: list[str],
         title: str | None = None,
         url: str | None = None,
-    ):
-        target = self._get_or_walk(path)
+    ) -> None:
+        target = self._resolve(path)
         if target is None:
             raise ValueError("Target not found")
         if title is not None:
@@ -185,8 +206,8 @@ class CLI:
             target.url = url
         self._save()
 
-    def empty(self, path: builtins.list[str]):
-        target = self._get_or_walk(path)
+    def empty(self, path: list[str]) -> None:
+        target = self._resolve(path)
         if target is None:
             raise ValueError("Target not found")
         if not target.is_folder:
@@ -195,13 +216,13 @@ class CLI:
         self._save()
 
 
-def generate_colors(output: IO) -> dict[str, str]:
+def generate_colors(output: IO[str]) -> dict[str, str]:
     if supports_colors(output):
         return {name: f"\033[{code}m" for name, code in COLORS.items()}
     return dict.fromkeys(COLORS.keys(), "")
 
 
-def supports_colors(tty: IO) -> bool:
+def supports_colors(tty: IO[str]) -> bool:
     if (
         "ANSI_COLORS_DISABLED" in os.environ
         or "NO_COLOR" in os.environ

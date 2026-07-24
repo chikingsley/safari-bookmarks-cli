@@ -237,9 +237,11 @@ def bootstrap_mcp(options: BootstrapOptions) -> list[str]:
     )
 
     if has_claude and scope in {"global", "both"}:
-        instructions.append("[global] Configure Claude Code (user scope) via CLI:")
-        instructions.append(
-            f"  - claude mcp add --transport stdio --scope user {server_name} -- {command_line}"
+        instructions.extend(
+            [
+                "[global] Configure Claude Code (user scope) via CLI:",
+                f"  - claude mcp add --transport stdio --scope user {server_name} -- {command_line}",
+            ]
         )
 
     if has_codex:
@@ -249,12 +251,16 @@ def bootstrap_mcp(options: BootstrapOptions) -> list[str]:
                 "configuration in ~/.codex/config.toml"
             )
         else:
-            instructions.append("[global] Configure Codex in ~/.codex/config.toml")
-            instructions.append(
-                "  - add the section below to your config file:\n"
-                f"    [mcp_servers.{server_name}]\n"
-                f'    command = "{server_entry["command"]}"\n'
-                f"    args = {json.dumps(server_entry['args'])}"
+            instructions.extend(
+                [
+                    "[global] Configure Codex in ~/.codex/config.toml",
+                    (
+                        "  - add the section below to your config file:\n"
+                        f"    [mcp_servers.{server_name}]\n"
+                        f'    command = "{server_entry["command"]}"\n'
+                        f"    args = {json.dumps(server_entry['args'])}"
+                    ),
+                ]
             )
 
     if scope in {"local", "both"}:

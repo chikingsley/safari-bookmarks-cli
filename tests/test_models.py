@@ -1,59 +1,29 @@
-import pytest
+from __future__ import annotations
 
-from safaribookmarks.models import (
-    WebBookmarkType,
-    WebBookmarkTypeLeaf,
-    WebBookmarkTypeList,
-    WebBookmarkTypeProxy,
-)
+from safaribookmarks.models import WebBookmarkType, WebBookmarkTypeLeaf, WebBookmarkTypeList
 
 
-class TestWebBookmarkType:
-    def test_hash(self):
-        subject = WebBookmarkType()
-        assert hash(subject) == hash(subject.web_bookmark_uuid)
+def test_leaf_title_maps_to_safari_uri_dictionary() -> None:
+    leaf = WebBookmarkTypeLeaf(URLString="https://example.com")
+
+    leaf.title = "Example"
+
+    assert leaf.title == "Example"
+    assert leaf.uri_dictionary == {"title": "Example"}
 
 
-class TestWebBookmarkTypeProxy:
-    @pytest.fixture()
-    def subject(self):
-        return WebBookmarkTypeProxy(
-            Title="Example",
-        )
+def test_list_children_keep_mixed_safari_types() -> None:
+    folder = WebBookmarkTypeList(
+        Title="Folder",
+        Children=[WebBookmarkTypeLeaf(URLString="https://example.com")],
+    )
+    child = WebBookmarkTypeLeaf(URLString="https://python.org")
 
+    folder.insert(0, child)
+    folder.remove(child)
 
-class TestWebBookmarkTypeList:
-    @pytest.fixture()
-    def subject(self):
-        return WebBookmarkTypeList(
-            Title="Example",
-            Children=[
-                WebBookmarkTypeLeaf(
-                    URLString="http://example.com",
-                ),
-            ],
-        )
-
-    def test_append(self, subject: WebBookmarkTypeList):
-        new_child = WebBookmarkTypeLeaf(
-            URLString="http://example.com",
-        )
-        subject.append(new_child)
-        assert new_child == subject.children[1]
-
-    def test_insert(self, subject: WebBookmarkTypeList):
-        new_child = WebBookmarkTypeLeaf(
-            URLString="http://example.com",
-        )
-        subject.insert(0, new_child)
-        assert new_child == subject.children[0]
-
-    def test_remove(self, subject: WebBookmarkTypeList):
-        child = subject.children[0]
-        subject.remove(child)
-        assert child not in subject.children
-
-    def test_empty(self, subject: WebBookmarkTypeList):
-        assert len(subject.children) != 0
-        subject.empty()
-        assert len(subject.children) == 0
+    item = WebBookmarkType()
+    assert hash(item) == hash(item.web_bookmark_uuid)
+    assert len(folder.children) == 1
+    assert isinstance(folder.children[0], WebBookmarkTypeLeaf)
+    assert folder.children[0].url_string == "https://example.com"

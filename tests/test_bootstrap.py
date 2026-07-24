@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import sys
 from pathlib import Path
@@ -13,7 +15,7 @@ def _project_root(tmp_path: Path) -> Path:
     return project
 
 
-def test_bootstrap_mcp_local_scope_writes_supported_clients(tmp_path: Path):
+def test_bootstrap_mcp_local_scope_writes_supported_clients(tmp_path: Path) -> None:
     project = _project_root(tmp_path)
     home = tmp_path.joinpath("home")
     home.mkdir()
@@ -54,7 +56,7 @@ def test_bootstrap_mcp_local_scope_writes_supported_clients(tmp_path: Path):
     assert gemini_entry["args"][-2:] == ["--file", str(bookmarks)]
 
 
-def test_bootstrap_mcp_global_scope_and_manual_clients(tmp_path: Path):
+def test_bootstrap_mcp_global_scope_and_manual_clients(tmp_path: Path) -> None:
     project = _project_root(tmp_path)
     home = tmp_path.joinpath("home")
     home.mkdir()
@@ -84,7 +86,7 @@ def test_bootstrap_mcp_global_scope_and_manual_clients(tmp_path: Path):
     )
 
 
-def test_bootstrap_mcp_invalid_inputs_raise(tmp_path: Path):
+def test_bootstrap_mcp_invalid_inputs_raise(tmp_path: Path) -> None:
     project = _project_root(tmp_path)
     with pytest.raises(ValueError, match="Unsupported client"):
         bootstrap_mcp(
@@ -97,7 +99,7 @@ def test_bootstrap_mcp_invalid_inputs_raise(tmp_path: Path):
         )
 
 
-def test_bootstrap_mcp_scope_local_for_codex_is_global_only(tmp_path: Path):
+def test_bootstrap_mcp_scope_local_for_codex_is_global_only(tmp_path: Path) -> None:
     project = _project_root(tmp_path)
     home = tmp_path.joinpath("home")
     home.mkdir()

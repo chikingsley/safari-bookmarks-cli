@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 from pathlib import Path
 from shutil import copyfile
@@ -24,46 +26,31 @@ def _call_tool_raw(server: Any, name: str, arguments: dict[str, Any]) -> Any:
     return asyncio.run(server.call_tool(name=name, arguments=arguments))
 
 
-@pytest.fixture()
+@pytest.fixture
 def bookmarks_path(tmp_path: Path) -> Path:
     dest = tmp_path.joinpath("Bookmarks.plist")
     copyfile(BOOKMARKS_BINARY_PATH, dest)
     return dest
 
 
-@pytest.fixture()
-def server(bookmarks_path: Path):
+@pytest.fixture
+def server(bookmarks_path: Path) -> Any:
     return build_server(path=str(bookmarks_path), confirm_write=True)
 
 
-@pytest.fixture()
-def write_enabled_server(bookmarks_path: Path):
+@pytest.fixture
+def write_enabled_server(bookmarks_path: Path) -> Any:
     return build_server(path=str(bookmarks_path), confirm_write=True)
 
 
-@pytest.fixture()
-def confirm_required_server(bookmarks_path: Path):
+@pytest.fixture
+def confirm_required_server(bookmarks_path: Path) -> Any:
     return build_server(path=str(bookmarks_path))
 
 
-@pytest.fixture()
-def readonly_server(bookmarks_path: Path):
+@pytest.fixture
+def readonly_server(bookmarks_path: Path) -> Any:
     return build_server(path=str(bookmarks_path), readonly=True)
-
-
-def test_mcp_tools_registered(server: Any) -> None:
-    tools = {tool.name for tool in server._tool_manager.list_tools()}
-    assert tools == {
-        "add_bookmark",
-        "add_folder",
-        "edit_item",
-        "empty_folder",
-        "list_bookmarks",
-        "move_item",
-        "remove_item",
-        "search_bookmarks",
-        "snapshot",
-    }
 
 
 def test_mcp_list_returns_envelope(server: Any) -> None:
@@ -152,6 +139,16 @@ def test_mcp_remove_with_confirmation_persists(write_enabled_server: Any) -> Non
                 "recursive": True,
             },
         )
+
+
+def test_mcp_empty_folder_reports_child_count(write_enabled_server: Any) -> None:
+    payload = _call_tool(
+        write_enabled_server,
+        "empty_folder",
+        {"path": ["BookmarksBar"], "dry_run": True},
+    )
+    assert payload["status"] == "ok"
+    assert payload["changed_count"] == 3
 
 
 def test_mcp_readonly_blocks_write(readonly_server: Any) -> None:

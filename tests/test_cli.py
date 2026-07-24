@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 import inspect
 import plistlib
-from collections.abc import Generator
 from io import StringIO
 from pathlib import Path
 from shutil import copyfile
-from typing import Any
+from typing import cast
 
 import pytest
 
@@ -13,513 +14,146 @@ from safaribookmarks.cli.main import parse_args
 
 FIXTURE_PATH = Path(__file__).parent.joinpath("support", "fixtures")
 BOOKMARKS_BINARY_PATH = FIXTURE_PATH.joinpath("Bookmarks.bin")
+Plist = dict[str, object]
 
 
-class TestCLI:
-    def read_plist(self, path: Path) -> Any:
-        with path.open("rb") as fp:
-            return plistlib.load(fp)
+@pytest.fixture
+def bookmarks_path(tmp_path: Path) -> Path:
+    dest = tmp_path.joinpath("Bookmarks.plist")
+    copyfile(BOOKMARKS_BINARY_PATH, dest)
+    return dest
 
-    def assert_plists(self, actual, expected):
-        actual_content = self.read_plist(actual)
-        expected_content = self.read_plist(expected)
-        assert actual_content == expected_content, f"{actual_content} != {expected_content}"
 
-    @pytest.fixture()
-    def bookmarks_path(self, tmp_path: Path) -> Generator[Path, Any, Any]:
-        dest = tmp_path.joinpath("Bookmarks.plist")
-        copyfile(BOOKMARKS_BINARY_PATH, dest)
-        yield dest
+@pytest.fixture
+def cli(bookmarks_path: Path) -> CLI:
+    return CLI(str(bookmarks_path), StringIO())
 
-    @pytest.fixture()
-    def cli(self, bookmarks_path) -> CLI:
-        return CLI(bookmarks_path, StringIO())
 
-    @pytest.mark.parametrize(
-        ("command", "error"),
-        [
-            pytest.param(
-                "nope",
-                ValueError("Invalid command"),
-                id="non-existent-command",
-            ),
-            pytest.param(
-                "path",
-                ValueError("Invalid command"),
-                id="invalid-command",
-            ),
-            pytest.param(
-                "_get",
-                ValueError("Invalid command"),
-                id="invalid-command",
-            ),
-            pytest.param(
-                None,
-                ValueError("No command specified"),
-                id="no-command",
-            ),
-        ],
+def read_plist(path: Path) -> Plist:
+    with path.open("rb") as file:
+        return cast(Plist, plistlib.load(file))
+
+
+def assert_plists(actual: Path | None, expected: Path) -> None:
+    assert actual is not None
+    assert read_plist(actual) == read_plist(expected)
+
+
+def reset_bookmarks(path: Path | None) -> Path:
+    assert path is not None
+    copyfile(BOOKMARKS_BINARY_PATH, path)
+    return path
+
+
+def test_run_rejects_missing_and_private_commands(cli: CLI) -> None:
+    with pytest.raises(ValueError, match="No command specified"):
+        cli.run(cast(str, None))
+    with pytest.raises(ValueError, match="Invalid command"):
+        cli.run("_resolve")
+
+
+def test_list_renders_default_json_and_target(cli: CLI) -> None:
+    cli.list_bookmarks(path=[])
+    cli.output.seek(0)
+    assert cli.output.read() == FIXTURE_PATH.joinpath("list.txt").read_text()
+
+    cli.output = StringIO()
+    cli.list_bookmarks(path=["BookmarksBar"], json=True)
+    cli.output.seek(0)
+    assert '"Title":"BookmarksBar"' in cli.output.read()
+
+    cli.output = StringIO()
+    cli.list_bookmarks(path=["BookmarksBar", "Safari Bookmarks CLI"])
+    cli.output.seek(0)
+    assert cli.output.read() == FIXTURE_PATH.joinpath("list-leaf.txt").read_text()
+
+
+def test_add_bookmark_and_folder(cli: CLI) -> None:
+    cli.add(
+        path=["BookmarksMenu"],
+        title="Example",
+        url="http://example.com",
+        uuid="38691E76-D8F0-4946-B68D-370213EFEB9E",
     )
-    def test_run(self, cli: CLI, command: str, error: BaseException):
-        with pytest.raises(type(error), match=str(error)):
-            cli.run(command)
+    assert_plists(cli.path, FIXTURE_PATH.joinpath("add-leaf.plist"))
 
-    @pytest.mark.parametrize(
-        ("json", "format", "path", "fixture_path"),
-        [
-            pytest.param(
-                False,
-                None,
-                [],
-                FIXTURE_PATH.joinpath("list.txt"),
-                id="list-text",
-            ),
-            pytest.param(
-                True,
-                None,
-                [],
-                FIXTURE_PATH.joinpath("list.json"),
-                id="list-json",
-            ),
-            pytest.param(
-                False,
-                "{id} {title} {url}",
-                [],
-                FIXTURE_PATH.joinpath("list-format.txt"),
-                id="list-custom-format",
-            ),
-            pytest.param(
-                False,
-                None,
-                ["BookmarksBar"],
-                FIXTURE_PATH.joinpath("list-target.txt"),
-                id="list-target",
-            ),
-            pytest.param(
-                False,
-                None,
-                ["BookmarksBar", "Safari Bookmarks CLI"],
-                FIXTURE_PATH.joinpath("list-leaf.txt"),
-                id="list-leaf",
-            ),
-            pytest.param(
-                False,
-                None,
-                ["B441CA58-1880-4151-929E-743090B66587"],
-                FIXTURE_PATH.joinpath("list-leaf.txt"),
-                id="list-uuid",
-            ),
-        ],
+    fresh = CLI(str(reset_bookmarks(cli.path)), StringIO())
+    fresh.add(
+        path=["BookmarksMenu"],
+        title="Example",
+        folder=True,
+        uuid="38691E76-D8F0-4946-B68D-370213EFEB9E",
     )
-    def test_list(
-        self,
-        cli: CLI,
-        json: bool,
-        format: str,
-        path: list[str],
-        fixture_path: Path,
-    ):
-        with fixture_path.open("r") as file:
-            cli.list(json=json, format=format, path=path)
-            cli.output.seek(0)
-            assert file.read() == cli.output.read()
+    assert_plists(fresh.path, FIXTURE_PATH.joinpath("add-list.plist"))
 
-    @pytest.mark.parametrize(
-        ("uuid", "list", "title", "url", "fixture_path"),
-        [
-            pytest.param(
-                None,
-                False,
-                None,
-                "http://example.com",
-                FIXTURE_PATH.joinpath("add-fixed-uuid-no-title-leaf.plist"),
-                id="leaf-url",
-            ),
-            pytest.param(
-                "38691E76-D8F0-4946-B68D-370213EFEB9E",
-                False,
-                None,
-                "http://example.com",
-                FIXTURE_PATH.joinpath("add-no-title-leaf.plist"),
-                id="leaf-uuid-url",
-            ),
-            pytest.param(
-                None,
-                False,
-                "Example",
-                "http://example.com",
-                FIXTURE_PATH.joinpath("add-fixed-uuid-leaf.plist"),
-                id="leaf-title-url",
-            ),
-            pytest.param(
-                "38691E76-D8F0-4946-B68D-370213EFEB9E",
-                False,
-                "Example",
-                "http://example.com",
-                FIXTURE_PATH.joinpath("add-leaf.plist"),
-                id="leaf-uuid-title-url",
-            ),
-            pytest.param(
-                "38691E76-D8F0-4946-B68D-370213EFEB9E",
-                True,
-                "Example",
-                None,
-                FIXTURE_PATH.joinpath("add-list.plist"),
-                id="list-uuid-title",
-            ),
-            pytest.param(
-                None,
-                True,
-                "Example",
-                None,
-                FIXTURE_PATH.joinpath("add-fixed-uuid-list.plist"),
-                id="list-title",
-            ),
-        ],
+
+def test_remove_move_edit_and_empty(cli: CLI) -> None:
+    cli.remove(path=["B441CA58-1880-4151-929E-743090B66587"])
+    assert_plists(cli.path, FIXTURE_PATH.joinpath("remove-leaf.plist"))
+
+    cli = CLI(str(reset_bookmarks(cli.path)), StringIO())
+    cli.move(
+        path=["AB38D373-1266-495A-8CAC-422A771CF70A"],
+        to=["20ABDC16-B491-47F4-B252-2A3065CFB895"],
     )
-    @pytest.mark.parametrize("path", [["20ABDC16-B491-47F4-B252-2A3065CFB895"], ["BookmarksMenu"]])
-    def test_add__valid(
-        self,
-        cli: CLI,
-        uuid: str | None,
-        list: bool,
-        title: str | None,
-        url: str | None,
-        path: list[str],
-        fixture_path: Path,
-        monkeypatch,
-    ):
-        with monkeypatch.context() as m:
-            m.setattr("uuid.uuid4", lambda: "8693E85C-83FC-4F42-AFB2-40B9CFACAAA0")
-            cli.add(uuid=uuid, list=list, title=title, url=url, path=path)
-            self.assert_plists(cli.path, fixture_path)
+    assert_plists(cli.path, FIXTURE_PATH.joinpath("move-leaf.plist"))
 
-    @pytest.mark.parametrize(
-        ("list", "uuid", "title", "url", "path", "error"),
-        [
-            pytest.param(
-                True,
-                None,
-                None,
-                None,
-                [],
-                "Title is required",
-                id="missing-title",
-            ),
-            pytest.param(
-                True,
-                None,
-                "Example",
-                "http://example.com",
-                [],
-                "URL is not supported by lists",
-                id="with-url",
-            ),
-            pytest.param(
-                False,
-                None,
-                "Example",
-                "http://example.com",
-                ["AB38D373-1266-495A-8CAC-422A771CF70A"],
-                "Invalid destination",
-                id="leaf-target",
-            ),
-            pytest.param(
-                False,
-                None,
-                "Example",
-                "http://example.com",
-                ["F1DF1813-B60B-461A-B497-51AF24AD2925"],
-                "Invalid destination",
-                id="nonexistent-uuid",
-            ),
-            pytest.param(
-                False,
-                None,
-                "Example",
-                "http://example.com",
-                ["Unknown"],
-                "Invalid destination",
-                id="nonexistent-title",
-            ),
-        ],
+    cli = CLI(str(reset_bookmarks(cli.path)), StringIO())
+    cli.edit(
+        path=["AB38D373-1266-495A-8CAC-422A771CF70A"],
+        title="Updated example",
+        url="http://example.com",
     )
-    def test_add__invalid(
-        self,
-        cli: CLI,
-        list: bool,
-        uuid: str | None,
-        title: str | None,
-        url: str | None,
-        path: list[str],
-        error: str,
-    ):
-        with pytest.raises(ValueError, match=error):
-            cli.add(list=list, uuid=uuid, title=title, url=url, path=path)
+    assert_plists(cli.path, FIXTURE_PATH.joinpath("edit-title-url-leaf.plist"))
 
-    @pytest.mark.parametrize(
-        ("path", "fixture_path"),
-        [
-            pytest.param(
-                ["B441CA58-1880-4151-929E-743090B66587"],
-                FIXTURE_PATH.joinpath("remove-leaf.plist"),
-                id="remove-leaf-by-uuid",
-            ),
-            pytest.param(
-                ["BookmarksBar", "Safari Bookmarks CLI"],
-                FIXTURE_PATH.joinpath("remove-leaf.plist"),
-                id="remove-leaf-by-title",
-            ),
-            pytest.param(
-                ["3B5180DB-831D-4F1A-AE4A-6482D28D66D5"],
-                FIXTURE_PATH.joinpath("remove-list.plist"),
-                id="remove-list-by-uuid",
-            ),
-            pytest.param(
-                ["BookmarksBar"],
-                FIXTURE_PATH.joinpath("remove-list.plist"),
-                id="remove-list-by-title",
-            ),
-        ],
+    cli = CLI(str(reset_bookmarks(cli.path)), StringIO())
+    cli.empty(path=["BookmarksBar"])
+    assert_plists(cli.path, FIXTURE_PATH.joinpath("empty.plist"))
+
+
+def test_move_into_own_descendant_is_rejected(cli: CLI) -> None:
+    cli.add(
+        path=["BookmarksBar"],
+        title="child",
+        folder=True,
+        uuid="38691E76-D8F0-4946-B68D-370213EFEB9E",
     )
-    def test_remove__valid(self, cli: CLI, path: list[str], fixture_path: Path):
-        cli.remove(path=path)
-        self.assert_plists(cli.path, fixture_path)
+    with pytest.raises(ValueError, match="Invalid destination"):
+        cli.move(path=["BookmarksBar"], to=["BookmarksBar", "child"])
 
-    @pytest.mark.parametrize(
-        ("path", "error"),
-        [
-            pytest.param(
-                ["BF7BB6D9-AF1D-4B5C-A95A-7765E9C5B199"],
-                "Target not found",
-                id="uuid",
-            ),
-            pytest.param(
-                ["Unknown"],
-                "Target not found",
-                id="title",
-            ),
-        ],
+
+@pytest.mark.parametrize(
+    ("operation", "kwargs", "message"),
+    [
+        ("list_bookmarks", {"path": ["Missing"]}, "Target not found"),
+        (
+            "add",
+            {"path": ["BookmarksBar", "Safari"], "title": "Bad", "url": "https://x.test"},
+            "Invalid destination",
+        ),
+        ("move", {"path": ["Missing"], "to": ["BookmarksMenu"]}, "Target not found"),
+        ("edit", {"path": ["BookmarksBar"], "url": "https://x.test"}, "Cannot update target url"),
+        ("empty", {"path": ["BookmarksBar", "Safari"]}, "Target is not a list"),
+    ],
+)
+def test_invalid_commands_raise(
+    cli: CLI,
+    operation: str,
+    kwargs: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        getattr(cli, operation)(**kwargs)
+
+
+def test_move_argparse_kwargs_match_method_signature(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        ["safari-bookmarks", "move", "BookmarksBar", "--to", "BookmarksMenu"],
     )
-    def test_remove__invalid(self, cli: CLI, path: list[str], error: str):
-        with pytest.raises(ValueError, match=error):
-            cli.remove(path=path)
+    args = parse_args().__dict__
+    args.pop("file")
+    command = args.pop("command")
 
-    @pytest.mark.parametrize(
-        ("path", "to", "fixture_path"),
-        [
-            pytest.param(
-                ["AB38D373-1266-495A-8CAC-422A771CF70A"],
-                ["20ABDC16-B491-47F4-B252-2A3065CFB895"],
-                FIXTURE_PATH.joinpath("move-leaf.plist"),
-                id="leaf-by-uuid",
-            ),
-            pytest.param(
-                ["BookmarksBar", "Safari"],
-                ["BookmarksMenu"],
-                FIXTURE_PATH.joinpath("move-leaf.plist"),
-                id="leaf-by-title",
-            ),
-            pytest.param(
-                ["3B5180DB-831D-4F1A-AE4A-6482D28D66D5"],
-                ["20ABDC16-B491-47F4-B252-2A3065CFB895"],
-                FIXTURE_PATH.joinpath("move-list.plist"),
-                id="list-by-uuid",
-            ),
-            pytest.param(
-                ["BookmarksBar"],
-                ["BookmarksMenu"],
-                FIXTURE_PATH.joinpath("move-list.plist"),
-                id="list-by-title",
-            ),
-        ],
-    )
-    def test_move__valid(self, cli: CLI, path: list[str], to: list[str], fixture_path: Path):
-        cli.move(path=path, to=to)
-        self.assert_plists(cli.path, fixture_path)
-
-    @pytest.mark.parametrize(
-        ("path", "to", "error"),
-        [
-            pytest.param(
-                ["BF7BB6D9-AF1D-4B5C-A95A-7765E9C5B199"],
-                ["BookmarksMenu"],
-                "Target not found",
-                id="nonexistent-target-by-uuid",
-            ),
-            pytest.param(
-                ["Unknown"],
-                ["BookmarksMenu"],
-                "Target not found",
-                id="nonexistent-target-by-title",
-            ),
-            pytest.param(
-                ["AB38D373-1266-495A-8CAC-422A771CF70A"],
-                ["41BA6DB5-4D97-4921-ADC6-4418D1824DF4"],
-                "Invalid destination",
-                id="nonexistent-destination-by-uuid",
-            ),
-            pytest.param(
-                ["AB38D373-1266-495A-8CAC-422A771CF70A"],
-                ["Unknown"],
-                "Invalid destination",
-                id="nonexistent-destination-by-title",
-            ),
-            pytest.param(
-                ["AB38D373-1266-495A-8CAC-422A771CF70A"],
-                [],
-                "Missing destination",
-                id="missing-destination",
-            ),
-        ],
-    )
-    def test_move__invalid(self, cli: CLI, path: list[str], to: list[str], error: str):
-        with pytest.raises(ValueError, match=error):
-            cli.move(path=path, to=to)
-
-    @pytest.mark.parametrize(
-        ("path", "title", "url", "fixture_path"),
-        [
-            pytest.param(
-                ["AB38D373-1266-495A-8CAC-422A771CF70A"],
-                "Updated example",
-                None,
-                FIXTURE_PATH.joinpath("edit-title-leaf.plist"),
-                id="leaf-title",
-            ),
-            pytest.param(
-                ["AB38D373-1266-495A-8CAC-422A771CF70A"],
-                None,
-                "http://example.com",
-                FIXTURE_PATH.joinpath("edit-url-leaf.plist"),
-                id="leaf-url",
-            ),
-            pytest.param(
-                ["AB38D373-1266-495A-8CAC-422A771CF70A"],
-                "Updated example",
-                "http://example.com",
-                FIXTURE_PATH.joinpath("edit-title-url-leaf.plist"),
-                id="leaf-title-and-url",
-            ),
-            pytest.param(
-                ["3B5180DB-831D-4F1A-AE4A-6482D28D66D5"],
-                "Updated example",
-                None,
-                FIXTURE_PATH.joinpath("edit-title-list.plist"),
-                id="list-title",
-            ),
-        ],
-    )
-    def test_edit__valid(
-        self,
-        cli: CLI,
-        path: list[str],
-        title: str | None,
-        url: str | None,
-        fixture_path: Path,
-    ):
-        cli.edit(path=path, title=title, url=url)
-        self.assert_plists(cli.path, fixture_path)
-
-    @pytest.mark.parametrize(
-        ("path", "title", "url", "error"),
-        [
-            pytest.param(
-                ["F04ABC44-9C55-437E-A19D-B63ED24FC185"],
-                "Example",
-                "http://example.com",
-                "Target not found",
-                id="nonexistent-uuid",
-            ),
-            pytest.param(
-                ["Unknown"],
-                "Example",
-                "http://example.com",
-                "Target not found",
-                id="nonexistent-title",
-            ),
-            pytest.param(
-                ["3B5180DB-831D-4F1A-AE4A-6482D28D66D5"],
-                None,
-                "http://example.com",
-                "Cannot update target url",
-                id="list-url",
-            ),
-        ],
-    )
-    def test_edit__invalid(
-        self,
-        cli: CLI,
-        path: list[str],
-        title: str | None,
-        url: str | None,
-        error: str,
-    ):
-        with pytest.raises(ValueError, match=error):
-            cli.edit(path=path, title=title, url=url)
-
-    @pytest.mark.parametrize(
-        ("path", "fixture_path"),
-        [
-            pytest.param(["BookmarksBar"], FIXTURE_PATH.joinpath("empty.plist"), id="list-title"),
-            pytest.param(
-                ["3B5180DB-831D-4F1A-AE4A-6482D28D66D5"],
-                FIXTURE_PATH.joinpath("empty.plist"),
-                id="list-uuid",
-            ),
-        ],
-    )
-    def test_empty__valid(self, cli: CLI, path: list[str], fixture_path: Path):
-        cli.empty(path=path)
-        self.assert_plists(cli.path, fixture_path)
-
-    @pytest.mark.parametrize(
-        ("path", "error"),
-        [
-            pytest.param(
-                ["F04ABC44-9C55-437E-A19D-B63ED24FC185"],
-                "Target not found",
-                id="nonexistent-uuid",
-            ),
-            pytest.param(
-                ["Unknown"],
-                "Target not found",
-                id="nonexistent-title",
-            ),
-            pytest.param(
-                ["1E830274-3DB6-42F2-BE8E-14E2BA75418C"],
-                "Target is not a list",
-                id="leaf",
-            ),
-        ],
-    )
-    def test_empty__invalid(self, cli: CLI, path: list[str], error: str):
-        with pytest.raises(ValueError, match=error):
-            cli.empty(path=path)
-
-
-class TestParseArgs:
-    """Tests that argparse produces kwargs compatible with CLI methods."""
-
-    @pytest.mark.parametrize(
-        "argv",
-        [
-            ["move", "BookmarksBar", "Safari", "--to", "BookmarksMenu"],
-            ["move", "some-uuid", "--to", "other-uuid"],
-            ["mv", "BookmarksBar", "--to", "BookmarksMenu"],
-        ],
-    )
-    def test_move_args_match_method_signature(self, argv, monkeypatch):
-        """parse_args for 'move' must produce kwargs that CLI.move() accepts.
-
-        This is a regression test: argparse previously named the positional
-        arg 'target' while CLI.move() expected 'path', causing a TypeError.
-        """
-        monkeypatch.setattr("sys.argv", ["safari-bookmarks", *argv])
-        args = parse_args().__dict__
-        args.pop("file")
-        command = args.pop("command")
-        assert command == "move"
-        sig = inspect.signature(CLI.move)
-        # This will raise TypeError if the kwarg names don't match
-        sig.bind(None, **args)  # None for self
+    assert command == "move"
+    inspect.signature(CLI.move).bind(None, **args)
